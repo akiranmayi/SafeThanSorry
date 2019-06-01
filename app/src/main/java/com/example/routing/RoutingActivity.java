@@ -1,27 +1,28 @@
 package com.example.routing;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.database.Cursor;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+
+
 import android.support.annotation.Nullable;
 import android.util.Log;
 import android.view.View;
-import android.widget.Adapter;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.ListAdapter;
-import android.widget.ListView;
+
 
 
 import com.example.routing.RoutingHelpers.FetchURL;
@@ -46,8 +47,6 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.widget.Filter;
 import android.widget.Filterable;
-import android.widget.ListAdapter;
-import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
@@ -64,9 +63,6 @@ import com.google.android.gms.location.LocationListener;
 import com.example.routing.RoutingHelpers.TaskLoadedCallback;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-
-import java.sql.Timestamp;
-import java.util.Date;
 
 
 import org.json.JSONArray;
@@ -88,8 +84,6 @@ import java.util.Locale;
 
 
 import android.widget.AdapterView.OnItemClickListener;
-
-
 
 
 public class RoutingActivity extends AppCompatActivity implements OnItemClickListener, OnMapReadyCallback, TaskLoadedCallback,GoogleApiClient.ConnectionCallbacks,
@@ -116,6 +110,7 @@ public class RoutingActivity extends AppCompatActivity implements OnItemClickLis
     Lock lock;
     Counter counter;
     Integer[] estCount;
+    //int i=0;
     //ListView nearbyHospList, nearbyPoliceList;
     //ArrayList<String> nearbyHospArray, nearbyPoliceArray;
     //HashMap<String, LatLng> hospitalNameToLatLngMap, policeNameToLatLngMap;
@@ -426,7 +421,7 @@ public class RoutingActivity extends AppCompatActivity implements OnItemClickLis
             br.close();
 
         } catch (Exception e) {
-            Log.d("Exception dwnloadng url", e.toString());
+            Log.d("Exceptiondownloadng url", e.toString());
         } finally {
             iStream.close();
             urlConnection.disconnect();
@@ -936,213 +931,151 @@ public class RoutingActivity extends AppCompatActivity implements OnItemClickLis
         });
 
 
-        int i, maxIndex = 0;
 
         Log.d("Number of routes", "before getNumber" + count);
 
-        try {
-            lock.lock();
-        }
-        catch(InterruptedException ie){
-            Log.d("Exception", "InterruptedException has occured" );
-        }
-
-        for (i = 0; i < count; i++) {
-            estCount[i] = -1;
-            if (poly.get(i) != null) {
-                getNumberOfEstablishmentsForRoute((PolylineOptions) poly.get(i), i);
-                if (estCount[maxIndex] < estCount[i])
-                    maxIndex = i;
-
-            }
-            if(i == count-1)
-                lock.unlock();
-        }
-
-        if (!lock.isLocked){
-            for (i = 0; i < count; i++) {
-                if (maxIndex != i) {
-
-                    PolylineOptions polylineOptions = poly.get(i);
-                    polylineOptions.color(Color.RED);
-                    polylineOptions.width(9);
-                    Polyline polyline = mMap.addPolyline(polylineOptions);
-                    polyline.setClickable(true);
-                }
-
-            }
-
-        PolylineOptions polylineOptions = poly.get(maxIndex);
-        polylineOptions.color(Color.BLUE);
-        polylineOptions.width(13);
-        Polyline polyline = mMap.addPolyline(polylineOptions);
-        polyline.setClickable(true);
+        Task1 task1 = new Task1(poly,count);
+        task1.execute();
 
     }
 
-}
-
-    /**
-     * Start: Methods and classes for getting nearby locations along a route
-     */
 
 
+    public class Task1 extends AsyncTask<Void ,Void,Void>
+    {
+        List<PolylineOptions> polylineOptions;
+        int count;
+        public Task1(List<PolylineOptions> polylineOptions,int count)
+        {
+            this. polylineOptions = polylineOptions;
+            this.count=count;
+        }
+        @Override
+        protected Void doInBackground(Void... params) {
 
-    void getNumberOfEstablishmentsForRoute(PolylineOptions polylineOptions, int index) {
-        counter.reset();
-        getDirection.setVisibility(View.INVISIBLE);
-        int i;
-        LatLng currentPoint;
-        List<LatLng> points = polylineOptions.getPoints();
+            Log.d("Number of routes", "in task 1" + count);
 
-        counter.reset();
-        counter.count = 0;
-        Log.d("Counter reset", "counterVal = "+counter.count);
-        //for (j = 0; j < mPlaceType.length; j++){
-            for (i = 0; i < points.size(); i = i + 6) {
-                currentPoint = (LatLng) points.get(i);
-                StringBuilder sb = new StringBuilder("https://maps.googleapis.com/maps/api/place/nearbysearch/json?");
-                sb.append("location=" + currentPoint.latitude + "," + currentPoint.longitude);
-                sb.append("&radius=50");
-                sb.append("&types=" + mPlaceType[i]);   //Only for hospitals
-                sb.append("&sensor=true");
-                sb.append("&key=" + getString(R.string.google_maps_key));                                                 /** API KEY **/
-                sb.append("&opennow=true");
+            int i=0;
+            int j=0;
 
-                // Creating a new non-ui thread task to download json data
-                PlacesTaskNonUI placesTaskNonUI = new PlacesTaskNonUI(index);
+            for (i = 0; i < count; i++) {
 
-                // Invokes the "doInBackground()" method of the class PlaceTask
-                placesTaskNonUI.execute(sb.toString());
-                if(i == points.size()-1) {
+                estCount[i] = -1;
+
+                if (polylineOptions.get(i) != null) {
+
+                    counter.reset();
+                    LatLng currentPoint;
+                    List<LatLng> points = polylineOptions.get(i).getPoints();
+                    counter.count = 0;
+                    int pointSize=points.size();
+                    Log.d("Counter reset", "counterVal = "+counter.count);
+
+                    for (j = 0; j < pointSize; j+=7) {
+
+                        //for (i = 0; i < pointSize; i = k+8) {
+                        currentPoint = (LatLng) points.get(j);
+                        StringBuilder sb1 = new StringBuilder("https://maps.googleapis.com/maps/api/place/nearbysearch/json?");
+                        sb1.append("location=" + currentPoint.latitude + "," + currentPoint.longitude);
+                        sb1.append("&radius=50");
+                        sb1.append("&types=" + mPlaceType[0]);   //Only for hospitals
+                        sb1.append("&sensor=true");
+                        sb1.append("&key=" + getString(R.string.google_maps_key));
+                        sb1.append("&opennow=true");
+
+
+                        String data = "";
+                        InputStream iStream = null;
+                        HttpURLConnection urlConnection = null;
+                        try {
+                            URL url = new URL(sb1.toString());
+
+                            // Creating an http connection to communicate with url
+                            urlConnection = (HttpURLConnection) url.openConnection();
+
+                            // Connecting to url
+                            urlConnection.connect();
+
+                            // Reading data from url
+                            iStream = urlConnection.getInputStream();
+
+                            BufferedReader br = new BufferedReader(new InputStreamReader(iStream));
+
+                            StringBuffer sb = new StringBuffer();
+
+                            String line = "";
+                            while ((line = br.readLine()) != null) {
+                                sb.append(line);
+                            }
+
+                            data = sb.toString();
+
+                            br.close();
+                            iStream.close();
+                            urlConnection.disconnect();
+
+                        } catch (Exception e) {
+                            Log.d("Exception dwnloadng url", e.toString());
+                        }
+
+                        List<HashMap<String, String>> places = null;
+                        PlaceJSONParser placeJsonParser = new PlaceJSONParser();
+                        JSONObject jObject;
+                        try {
+                            jObject = new JSONObject(data);
+
+                            /** Getting the parsed data as a List construct */
+                            places = placeJsonParser.parse(jObject);
+
+                        } catch (Exception e) {
+                            Log.d("Exception", e.toString());
+                        }
+
+                        counter.add(places.size());
+
+                    }
+                    estCount[i] = counter.count;
+                    Log.d(" InParseNonUI ", " value:  " + estCount[i] + " in " + i + " counter= " + counter.count);
                     counter.count = 0;
 
                 }
 
             }
-
-
+            return null;
         }
-    //}
 
+        // Executed after the complete execution of doInBackground() method
+        @Override
+        protected void onPostExecute(Void param) {
 
-        /** A method to download json data from url */
-        private String downloadUrlNonUI (String strUrl) throws IOException {
-            String data = "";
-            InputStream iStream = null;
-            HttpURLConnection urlConnection = null;
-            try {
-                URL url = new URL(strUrl);
+            int maxIndex=0;
+            for (int i = 0; i < count; i++) {
+                    if (estCount[maxIndex] < estCount[i])
+                        maxIndex = i;
 
-                // Creating an http connection to communicate with url
-                urlConnection = (HttpURLConnection) url.openConnection();
-
-                // Connecting to url
-                urlConnection.connect();
-
-                // Reading data from url
-                iStream = urlConnection.getInputStream();
-
-                BufferedReader br = new BufferedReader(new InputStreamReader(iStream));
-
-                StringBuffer sb = new StringBuffer();
-
-                String line = "";
-                while ((line = br.readLine()) != null) {
-                    sb.append(line);
                 }
 
-                data = sb.toString();
-
-                br.close();
-
-            } catch (Exception e) {
-                Log.d("Exception dwnloadng url", e.toString());
-            } finally {
-                iStream.close();
-                urlConnection.disconnect();
+        for(int i = 0; i < count; i++) {
+            if (maxIndex != i) {
+                PolylineOptions polylineOptions1 = polylineOptions.get(i);
+                polylineOptions1.color(Color.RED);
+                polylineOptions1.width(9);
+                Polyline polyline = mMap.addPolyline(polylineOptions1);
+                polyline.setClickable(true);
             }
-
-            return data;
+            Log.d("Not max", "Not max value: "+estCount[i]);
         }
 
-        /** A class, to download Google Places */
-        private class PlacesTaskNonUI extends AsyncTask<String, Integer, String> {
-            int index;
-
-            public PlacesTaskNonUI(int i ){
-                this.index = i;
-            }
-
-            String data = null;
-
-            // Invoked by execute() method of this object
-            @Override
-            protected String doInBackground(String... url) {
-                try {
-                    data = downloadUrlNonUI(url[0]);
-                } catch (Exception e) {
-                    Log.d("Background Task", e.toString());
-                }
-                return data;
-            }
-
-            // Executed after the complete execution of doInBackground() method
-            @Override
-            protected void onPostExecute(String result) {
-                ParserTaskNonUI parserTaskNonUI = new ParserTaskNonUI(index);
-
-                // Start parsing the Google places in JSON format
-                // Invokes the "doInBackground()" method of the class ParseTask
-                parserTaskNonUI.execute(result);
-
-
-            }
-
-
+        PolylineOptions polylineOptions1 = polylineOptions.get(maxIndex);
+        polylineOptions1.color(Color.BLUE);
+        polylineOptions1.width(13);
+        Polyline polyline = mMap.addPolyline(polylineOptions1);
+        polyline.setClickable(true);
+            Log.d("Max: ", "Max value: "+estCount[maxIndex]);
         }
 
-        /** A class to parse the Google Places in JSON format */
-        private class ParserTaskNonUI extends AsyncTask<String, Integer, List<HashMap<String, String>>> {
-            JSONObject jObject;
-            int index;
+    }
 
-            public ParserTaskNonUI(int i ){
-                this.index = i;
-            }
-
-            // Invoked by execute() method of this object
-            @Override
-            protected List<HashMap<String, String>> doInBackground(String... jsonData) {
-
-                List<HashMap<String, String>> places = null;
-                PlaceJSONParser placeJsonParser = new PlaceJSONParser();
-
-                try {
-                    jObject = new JSONObject(jsonData[0]);
-
-                    /** Getting the parsed data as a List construct */
-                    places = placeJsonParser.parse(jObject);
-
-                } catch (Exception e) {
-                    Log.d("Exception", e.toString());
-                }
-
-                return places;
-            }
-
-            // Executed after the complete execution of doInBackground() method
-            @Override
-            public void onPostExecute(List<HashMap<String, String>> list) {
-
-                counter.add(list.size());
-                estCount[index] = counter.count;
-                Log.d("InParserNonUI", "value: " + estCount[index] + " in " + index + "counter="+ counter.count);
-
-            }
-
-
-        }
 
 
     /**

@@ -1,7 +1,7 @@
 package com.example.routing;
 
 public class Counter {
-    Integer count;
+    public Integer count;
     public boolean isLocked = false;
     public Counter(){
         this.count = 0;
