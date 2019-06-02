@@ -957,6 +957,7 @@ public class RoutingActivity extends AppCompatActivity implements OnItemClickLis
 
             int i=0;
             int j=0;
+            int k=0;
 
             for (i = 0; i < count; i++) {
 
@@ -971,68 +972,69 @@ public class RoutingActivity extends AppCompatActivity implements OnItemClickLis
                     int pointSize=points.size();
                     Log.d("Counter reset", "counterVal = "+counter.count);
 
-                    for (j = 0; j < pointSize; j+=7) {
+                    //for (j = 0; j < pointSize; j+=7) {
+                    for(j=0;j<mPlaceType.length;j++) {
+                        for (k = 0; k < pointSize; k = k + 7) {
+                            currentPoint = (LatLng) points.get(k);
+                            StringBuilder sb1 = new StringBuilder("https://maps.googleapis.com/maps/api/place/nearbysearch/json?");
+                            sb1.append("location=" + currentPoint.latitude + "," + currentPoint.longitude);
+                            sb1.append("&radius=50");
+                            sb1.append("&types=" + mPlaceType[j]);   //Only for hospitals
+                            sb1.append("&sensor=true");
+                            sb1.append("&key=" + getString(R.string.google_maps_key));
+                            sb1.append("&opennow=true");
 
-                        //for (i = 0; i < pointSize; i = k+8) {
-                        currentPoint = (LatLng) points.get(j);
-                        StringBuilder sb1 = new StringBuilder("https://maps.googleapis.com/maps/api/place/nearbysearch/json?");
-                        sb1.append("location=" + currentPoint.latitude + "," + currentPoint.longitude);
-                        sb1.append("&radius=50");
-                        sb1.append("&types=" + mPlaceType[0]);   //Only for hospitals
-                        sb1.append("&sensor=true");
-                        sb1.append("&key=" + getString(R.string.google_maps_key));
-                        sb1.append("&opennow=true");
 
+                            String data = "";
+                            InputStream iStream = null;
+                            HttpURLConnection urlConnection = null;
+                            try {
+                                URL url = new URL(sb1.toString());
 
-                        String data = "";
-                        InputStream iStream = null;
-                        HttpURLConnection urlConnection = null;
-                        try {
-                            URL url = new URL(sb1.toString());
+                                // Creating an http connection to communicate with url
+                                urlConnection = (HttpURLConnection) url.openConnection();
 
-                            // Creating an http connection to communicate with url
-                            urlConnection = (HttpURLConnection) url.openConnection();
+                                // Connecting to url
+                                urlConnection.connect();
 
-                            // Connecting to url
-                            urlConnection.connect();
+                                // Reading data from url
+                                iStream = urlConnection.getInputStream();
 
-                            // Reading data from url
-                            iStream = urlConnection.getInputStream();
+                                BufferedReader br = new BufferedReader(new InputStreamReader(iStream));
 
-                            BufferedReader br = new BufferedReader(new InputStreamReader(iStream));
+                                StringBuffer sb = new StringBuffer();
 
-                            StringBuffer sb = new StringBuffer();
+                                String line = "";
+                                while ((line = br.readLine()) != null) {
+                                    sb.append(line);
+                                }
 
-                            String line = "";
-                            while ((line = br.readLine()) != null) {
-                                sb.append(line);
+                                data = sb.toString();
+
+                                br.close();
+                                iStream.close();
+                                urlConnection.disconnect();
+
+                            } catch (Exception e) {
+                                Log.d("Exception dwnloadng url", e.toString());
                             }
 
-                            data = sb.toString();
+                            List<HashMap<String, String>> places = null;
+                            PlaceJSONParser placeJsonParser = new PlaceJSONParser();
+                            JSONObject jObject;
+                            try {
+                                jObject = new JSONObject(data);
 
-                            br.close();
-                            iStream.close();
-                            urlConnection.disconnect();
+                                /** Getting the parsed data as a List construct */
+                                places = placeJsonParser.parse(jObject);
 
-                        } catch (Exception e) {
-                            Log.d("Exception dwnloadng url", e.toString());
+                            } catch (Exception e) {
+                                Log.d("Exception", e.toString());
+                            }
+
+                            counter.add(places.size());
+
                         }
-
-                        List<HashMap<String, String>> places = null;
-                        PlaceJSONParser placeJsonParser = new PlaceJSONParser();
-                        JSONObject jObject;
-                        try {
-                            jObject = new JSONObject(data);
-
-                            /** Getting the parsed data as a List construct */
-                            places = placeJsonParser.parse(jObject);
-
-                        } catch (Exception e) {
-                            Log.d("Exception", e.toString());
-                        }
-
-                        counter.add(places.size());
-
                     }
                     estCount[i] = counter.count;
                     Log.d(" InParseNonUI ", " value:  " + estCount[i] + " in " + i + " counter= " + counter.count);
